@@ -1,0 +1,950 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <link rel="icon" href="data:,">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>리전 간 라우팅 데모</title>
+<style>
+:root {
+  --bg: #f7f7f5; --surface: #ffffff; --surface-2: #f0f0ed; --text: #1c1c1a; --muted: #6b6b66;
+  --border: #dddcd6; --accent: #c74634; --accent-2: #2f6f8f; --ok: #2e7d4f; --err: #b3261e;
+  --err-bg: #fdecea; --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #161615; --surface: #1f1f1d; --surface-2: #2a2a27; --text: #ecebe6; --muted: #a09f98;
+    --border: #3a3a36; --accent: #ef6a55; --accent-2: #6bb3d6; --ok: #6cc78f; --err: #ff8a80; --err-bg: #3a1d1b;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #161615; --surface: #1f1f1d; --surface-2: #2a2a27; --text: #ecebe6; --muted: #a09f98;
+  --border: #3a3a36; --accent: #ef6a55; --accent-2: #6bb3d6; --ok: #6cc78f; --err: #ff8a80; --err-bg: #3a1d1b;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Segoe UI", sans-serif; }
+main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 64px; }
+h1 { font-size: 1.5rem; margin: 0 0 4px; line-height: 1.3; }
+h2 { font-size: 1.15rem; margin: 0 0 12px; }
+h3 { font-size: 1rem; margin: 0 0 6px; }
+.sub { color: var(--muted); margin: 0 0 24px; }
+section { margin-bottom: 28px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; min-width: 0; }
+.tag { display: inline-block; font-size: .75rem; padding: 1px 8px; border-radius: 99px; border: 1px solid var(--border); color: var(--muted); margin-bottom: 6px; }
+.tag.primary { border-color: var(--accent); color: var(--accent); }
+.card p { margin: 6px 0; }
+svg.flow { width: 100%; height: auto; margin: 8px 0; }
+svg.flow rect { fill: var(--surface-2); stroke: var(--border); }
+svg.flow rect.hl { stroke: var(--accent); }
+svg.flow text { fill: var(--text); font-size: 11px; font-family: inherit; }
+svg.flow text.small { fill: var(--muted); font-size: 9.5px; }
+svg.flow line, svg.flow path { stroke: var(--muted); fill: none; }
+svg.flow .head { fill: var(--muted); stroke: none; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; }
+code, .mono { font-family: var(--mono); font-size: .85em; word-break: break-all; }
+.ok { color: var(--ok); } .bad { color: var(--err); }
+.controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 12px; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; background: var(--surface); color: var(--text); padding: 6px 12px; cursor: pointer; font: inherit; }
+.seg button[aria-pressed="true"] { background: var(--accent-2); color: #fff; }
+button.btn { border: 1px solid var(--border); background: var(--surface); color: var(--text); padding: 7px 14px; border-radius: 8px; cursor: pointer; font: inherit; }
+button.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+#transcript { min-height: 220px; max-height: 520px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 12px; background: var(--surface-2); border-radius: 8px; margin-bottom: 12px; }
+.msg { padding: 8px 12px; border-radius: 8px; max-width: 92%; white-space: pre-wrap; word-wrap: break-word; }
+.msg.user { align-self: flex-end; background: var(--accent-2); color: #fff; }
+.msg.assistant { align-self: flex-start; background: var(--surface); border: 1px solid var(--border); }
+.info { font-size: .8rem; color: var(--muted); margin-top: 6px; font-family: var(--mono); white-space: normal; }
+.info b { color: var(--text); }
+.empty { color: var(--muted); text-align: center; margin: auto; }
+.error { background: var(--err-bg); color: var(--err); border: 1px solid var(--err); border-radius: 8px; padding: 8px 12px; font-size: .85rem; }
+.error pre { white-space: pre-wrap; word-break: break-all; margin: 6px 0 0; font-family: var(--mono); font-size: .8rem; }
+form.chat { display: flex; gap: 8px; }
+form.chat textarea { flex: 1; min-width: 0; resize: vertical; min-height: 44px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; }
+.bars { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; }
+.bar-row { display: grid; grid-template-columns: 140px 1fr 40px; gap: 8px; align-items: center; font-size: .85rem; }
+.bar { height: 14px; background: var(--accent-2); border-radius: 3px; min-width: 2px; }
+input[type=number] { width: 70px; padding: 5px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; }
+.note { font-size: .85rem; color: var(--muted); }
+input.text { padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; min-width: 0; flex: 1 1 220px; }
+input[type=file] { font: inherit; color: var(--text); max-width: 100%; }
+.vs-step { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 12px; }
+.vs-step:first-of-type { border-top: 0; padding-top: 0; margin-top: 0; }
+tr.pick { cursor: pointer; } tr.pick:hover td { background: var(--surface-2); }
+tr.pick.sel td { background: var(--surface-2); box-shadow: inset 3px 0 0 var(--accent-2); }
+.chunk { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin: 8px 0; background: var(--surface-2); }
+.chunk .score { font-family: var(--mono); font-size: .8rem; color: var(--accent-2); }
+.chunk div { white-space: pre-wrap; word-wrap: break-word; font-size: .9rem; }
+.answer { white-space: pre-wrap; word-wrap: break-word; background: var(--surface-2); border-radius: 8px; padding: 10px 12px; min-height: 44px; margin-top: 8px; }
+svg.flow rect.bad { stroke: var(--err); stroke-dasharray: 4 3; fill: var(--err-bg); }
+svg.flow text.bad { fill: var(--err); }
+nav.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin: 0 0 24px; overflow-x: auto; }
+nav.tabs a { padding: 8px 14px; color: var(--muted); text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+nav.tabs a[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+pre.code { margin: 0; padding: 8px 10px; background: var(--surface-2); border-radius: 6px; font-family: var(--mono); font-size: .8rem; white-space: pre-wrap; word-break: break-all; }
+.code-wrap { display: flex; gap: 6px; align-items: flex-start; }
+.code-wrap pre { flex: 1; min-width: 0; }
+button.copy { flex: none; border: 1px solid var(--border); background: var(--surface); color: var(--muted); padding: 2px 8px; border-radius: 6px; cursor: pointer; font: inherit; font-size: .75rem; }
+.d-forms { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.d-forms textarea, .d-forms select { width: 100%; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; margin-bottom: 8px; }
+.d-forms textarea { resize: vertical; }
+.d-forms label { display: block; font-size: .85rem; color: var(--muted); }
+.d-forms input.text { width: 100%; margin-bottom: 8px; }
+.result { background: var(--surface-2); border-radius: 8px; padding: 8px 10px; margin-top: 8px; font-size: .85rem; }
+.result pre { margin: 4px 0 0; white-space: pre-wrap; word-break: break-all; font-family: var(--mono); font-size: .8rem; }
+@media (max-width: 560px) { .bar-row { grid-template-columns: 100px 1fr 32px; } form.chat { flex-direction: column; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>OCI Generative AI 리전 간 라우팅 데모 — Seoul → Chicago, xai.grok-4.3</h1>
+    <p class="sub">OpenAI 호환 API(Chat Completions / Responses) + 라우팅 프로파일. 실제 서빙 리전은 응답 헤더 <code>x-genai-selected-region</code>으로 확인합니다.</p>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <a href="#demo" role="tab" id="tab-btn-demo" aria-controls="tab-demo" aria-selected="true">데모</a>
+    <a href="#policies" role="tab" id="tab-btn-policies" aria-controls="tab-policies" aria-selected="false">필요 정책 (최소)</a>
+  </nav>
+
+  <div id="tab-demo" role="tabpanel" aria-labelledby="tab-btn-demo">
+  <section>
+    <h2>두 가지 케이스</h2>
+    <div class="grid">
+      <div class="card">
+        <span class="tag">Case A · 튜토리얼 2026-10-14</span>
+        <h3>Route Model Requests Across OCI Regions</h3>
+        <p>로컬 모델 처리가 <b>있는</b> 리전(Chicago <code>us-chicago-1</code>) 엔드포인트를 호출하고, 라우팅 프로파일의 여러 타깃 리전 중 하나에서 처리됩니다. 서빙 리전이 엔드포인트 리전과 다를 수 있습니다.</p>
+        <svg class="flow" viewBox="0 0 420 120" role="img" aria-label="Case A 요청 흐름">
+          <defs><marker id="arA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path class="head" d="M0,0L10,5L0,10z"/></marker></defs>
+          <rect x="4" y="44" width="62" height="32" rx="6"/><text x="35" y="64" text-anchor="middle">Client</text>
+          <rect class="hl" x="90" y="38" width="96" height="44" rx="6"/><text x="138" y="57" text-anchor="middle">us-chicago-1</text><text class="small" x="138" y="71" text-anchor="middle">엔드포인트(로컬 처리 O)</text>
+          <rect x="210" y="44" width="78" height="32" rx="6"/><text x="249" y="58" text-anchor="middle">라우팅</text><text class="small" x="249" y="70" text-anchor="middle">프로파일</text>
+          <rect x="316" y="6" width="100" height="28" rx="6"/><text x="366" y="24" text-anchor="middle">us-chicago-1</text>
+          <rect x="316" y="46" width="100" height="28" rx="6"/><text x="366" y="64" text-anchor="middle">타깃 리전 2</text>
+          <rect x="316" y="86" width="100" height="28" rx="6"/><text x="366" y="104" text-anchor="middle">타깃 리전 N</text>
+          <line x1="66" y1="60" x2="88" y2="60" marker-end="url(#arA)"/>
+          <line x1="186" y1="60" x2="208" y2="60" marker-end="url(#arA)"/>
+          <path d="M288,60 L302,60 L302,20 L314,20" marker-end="url(#arA)"/>
+          <line x1="302" y1="60" x2="314" y2="60" marker-end="url(#arA)"/>
+          <path d="M302,60 L302,100 L314,100" marker-end="url(#arA)"/>
+        </svg>
+      </div>
+      <div class="card">
+        <span class="tag primary">Case B · 릴리스 2026-10-20 · 주 시나리오</span>
+        <h3>Global Generative AI availability</h3>
+        <p>로컬 모델 처리가 <b>없는</b> Seoul <code>ap-seoul-1</code> 엔드포인트를 호출하고, Chicago만 타깃으로 하는 라우팅 프로파일로 Chicago에서 실행됩니다.</p>
+        <svg class="flow" viewBox="0 0 420 120" role="img" aria-label="Case B 요청 흐름">
+          <defs><marker id="arB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path class="head" d="M0,0L10,5L0,10z"/></marker></defs>
+          <rect x="4" y="44" width="62" height="32" rx="6"/><text x="35" y="64" text-anchor="middle">Client</text>
+          <rect class="hl" x="90" y="38" width="96" height="44" rx="6"/><text x="138" y="57" text-anchor="middle">ap-seoul-1</text><text class="small" x="138" y="71" text-anchor="middle">엔드포인트(로컬 처리 X)</text>
+          <rect x="210" y="44" width="78" height="32" rx="6"/><text x="249" y="58" text-anchor="middle">라우팅</text><text class="small" x="249" y="70" text-anchor="middle">프로파일</text>
+          <rect class="hl" x="316" y="44" width="100" height="32" rx="6"/><text x="366" y="58" text-anchor="middle">us-chicago-1</text><text class="small" x="366" y="70" text-anchor="middle">서빙 리전(유일 타깃)</text>
+          <line x1="66" y1="60" x2="88" y2="60" marker-end="url(#arB)"/>
+          <line x1="186" y1="60" x2="208" y2="60" marker-end="url(#arB)"/>
+          <line x1="288" y1="60" x2="314" y2="60" marker-end="url(#arB)"/>
+        </svg>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <h3>핵심 차이</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>항목</th><th>Case A</th><th>Case B</th></tr></thead>
+          <tbody>
+            <tr><td>엔드포인트 리전의 로컬 모델 처리</td><td>있음 (Chicago)</td><td>없음 (Seoul, 30개 OC1 리전 중 하나)</td></tr>
+            <tr><td>일반적인 타깃 리전 구성</td><td>여러 리전 (튜토리얼 예: Chicago + Frankfurt + Osaka / 이 데모: Chicago + Ashburn + Phoenix, grok-4.3 제공 리전)</td><td>단일 리전 (Chicago)</td></tr>
+            <tr><td>대상</td><td>로컬 리전에 없는 모델을 쓰거나 여러 리전으로 분산하려는 사용자</td><td>로컬 GPU가 없는 리전(Seoul)에서 앱을 운영하는 사용자</td></tr>
+            <tr><td>서빙 리전</td><td>타깃 중 하나 (라운드로빈 아님, 정책 비공개)</td><td>항상 Chicago 기대</td></tr>
+            <tr><td>데이터 레지던시</td><td>요청은 선택된 타깃 리전에서 처리됨</td><td>요청은 타깃 리전에서 처리되며 Seoul을 벗어남</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>구성 상태</h2>
+    <div class="card table-wrap">
+      <table>
+        <thead><tr><th>케이스</th><th>리전</th><th>엔드포인트</th><th>프로파일 OCID</th><th>모델</th><th>상태</th></tr></thead>
+        <tbody id="config-body"><tr><td colspan="6" class="note">불러오는 중…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>채팅 데모</h2>
+    <div class="card">
+      <div class="controls">
+        <div class="seg" id="case-seg" role="group" aria-label="케이스">
+          <button type="button" data-v="A" aria-pressed="false">Case A</button>
+          <button type="button" data-v="B" aria-pressed="true">Case B</button>
+        </div>
+        <div class="seg" id="api-seg" role="group" aria-label="API">
+          <button type="button" data-v="chat_completions" aria-pressed="true">Chat Completions</button>
+          <button type="button" data-v="responses" aria-pressed="false">Responses</button>
+        </div>
+        <button type="button" class="btn" id="reset">대화 초기화</button>
+      </div>
+      <div id="transcript"><p class="empty">메시지를 입력하세요. 대화 기록은 브라우저에만 보관되며 매 요청마다 다시 전송됩니다.</p></div>
+      <form class="chat" id="chat-form">
+        <textarea id="input" rows="2" placeholder="예: 서울에서 시카고까지 비행 시간은?"></textarea>
+        <button type="submit" class="btn primary" id="send">보내기</button>
+      </form>
+      <p class="note">케이스를 바꾸면 대화가 초기화됩니다.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>라우팅 분포 프로브</h2>
+    <div class="card">
+      <p class="note">짧은 비스트리밍 요청을 n회 보내 <code>x-genai-selected-region</code> 분포를 확인합니다. 타깃이 여러 개여도 라운드로빈이 아닙니다(정책 비공개). 현재 선택된 케이스를 사용합니다.</p>
+      <div class="controls">
+        <label>n <input type="number" id="probe-n" min="1" max="20" value="5"></label>
+        <button type="button" class="btn primary" id="probe-btn">프로브 실행</button>
+        <span class="note" id="probe-status"></span>
+      </div>
+      <div id="probe-out"></div>
+    </div>
+  </section>
+  <section>
+    <h2>Case C · 벡터 스토어 / File Search</h2>
+    <div class="card">
+      <span class="tag primary">Enterprise AI Agents · 리전 리소스</span>
+      <h3>Files · Vector stores · file_search</h3>
+      <p><b>Files</b>는 업로드한 문서, <b>Vector store</b>는 문서를 청크로 나눠 임베딩한 검색 인덱스, <b>file_search</b>는 Responses API가 답변 전에 벡터 스토어를 검색하도록 하는 툴입니다. 모두 OCI Generative AI의 Enterprise AI Agents 기능입니다.</p>
+      <p>이 리소스들은 <b>엔드포인트 리전에 생성되는 리전 리소스</b>이며 라우팅 프로파일로 다른 리전에 넘겨지지 않습니다. <b>Seoul은 지원하지 않습니다</b>: 벡터 스토어 생성은 <code>403 {"code":"NotAllowed","message":"GenerativeAiVectorStore is not supported"}</code>, Files 업로드는 <code>404</code>. 그래서 이 데모는 Chicago(<code>us-chicago-1</code>)에 만듭니다.</p>
+      <p>또한 라우팅 프로파일 OCID를 <code>model</code>로 지정하고 <code>tools</code>를 함께 쓰면 400(entity not found)이 나므로, Case C는 Chicago 엔드포인트에서 <code>xai.grok-4.3</code> 모델 이름을 직접 호출합니다.</p>
+      <svg class="flow" viewBox="0 0 640 150" role="img" aria-label="Case C 요청 흐름: Client, Chicago 컨트롤 플레인에서 벡터 스토어 생성, Chicago 데이터 플레인에서 업로드와 연결, Responses와 file_search, 답변">
+        <defs><marker id="arC" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path class="head" d="M0,0L10,5L0,10z"/></marker></defs>
+        <rect x="4" y="30" width="96" height="44" rx="6"/><text x="52" y="56" text-anchor="middle">Client</text>
+        <rect class="hl" x="128" y="30" width="114" height="44" rx="6"/><text x="185" y="49" text-anchor="middle">Chicago CP</text><text class="small" x="185" y="63" text-anchor="middle">서명 · 벡터 스토어 생성</text>
+        <rect class="hl" x="270" y="30" width="114" height="44" rx="6"/><text x="327" y="49" text-anchor="middle">Chicago DP</text><text class="small" x="327" y="63" text-anchor="middle">API 키 · 업로드/연결</text>
+        <rect class="hl" x="412" y="30" width="122" height="44" rx="6"/><text x="473" y="49" text-anchor="middle">Responses</text><text class="small" x="473" y="63" text-anchor="middle">file_search · grok-4.3</text>
+        <rect x="562" y="30" width="74" height="44" rx="6"/><text x="599" y="56" text-anchor="middle">답변</text>
+        <line x1="100" y1="52" x2="126" y2="52" marker-end="url(#arC)"/>
+        <line x1="242" y1="52" x2="268" y2="52" marker-end="url(#arC)"/>
+        <line x1="384" y1="52" x2="410" y2="52" marker-end="url(#arC)"/>
+        <line x1="534" y1="52" x2="560" y2="52" marker-end="url(#arC)"/>
+        <rect class="bad" x="128" y="98" width="256" height="40" rx="6"/>
+        <text class="bad" x="256" y="115" text-anchor="middle">ap-seoul-1: 미지원</text>
+        <text class="small" x="256" y="129" text-anchor="middle">CP 403 NotAllowed · Files 404</text>
+        <path d="M52,74 L52,118 L126,118" stroke-dasharray="4 3" marker-end="url(#arC)"/>
+      </svg>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="controls">
+        <div class="seg" id="vs-case-seg" role="group" aria-label="벡터 스토어 리전">
+          <button type="button" data-v="A" aria-pressed="true">A · Chicago</button>
+          <button type="button" data-v="B" aria-pressed="false">B · Seoul</button>
+        </div>
+        <span class="note" id="vs-region-note"></span>
+      </div>
+      <p class="note">Seoul을 선택하면 실제 403/404 오류를 그대로 볼 수 있습니다. 모델: <code id="vs-model">—</code></p>
+
+      <div class="vs-step">
+        <h3>1. 벡터 스토어 생성</h3>
+        <div class="controls">
+          <input class="text" id="vs-name" placeholder="이름" value="demo-vector-store">
+          <button type="button" class="btn primary" id="vs-create">벡터 스토어 생성</button>
+          <span class="note" id="vs-create-status"></span>
+        </div>
+        <div id="vs-create-out"></div>
+      </div>
+
+      <div class="vs-step">
+        <h3>2. 벡터 스토어 목록</h3>
+        <div class="controls">
+          <button type="button" class="btn" id="vs-list-btn">목록 새로고침</button>
+          <label class="note" for="vs-id">활성 벡터 스토어</label>
+          <input class="text mono" id="vs-id" placeholder="vs_… (행을 클릭하거나 직접 입력)">
+        </div>
+        <div id="vs-list-out"></div>
+      </div>
+
+      <div class="vs-step">
+        <h3>3. 파일 업로드 및 연결</h3>
+        <div class="controls">
+          <input type="file" id="vs-file" accept=".txt,.md,.pdf,.json,.html,.csv,.docx">
+          <button type="button" class="btn primary" id="vs-upload">업로드 및 연결</button>
+          <span class="note" id="vs-upload-status"></span>
+        </div>
+        <div id="vs-files-out"></div>
+      </div>
+
+      <div class="vs-step">
+        <h3>4. 검색</h3>
+        <form class="chat" id="vs-search-form">
+          <input class="text" id="vs-query" placeholder="예: 비밀 코드명은?">
+          <button type="submit" class="btn" id="vs-search">검색</button>
+        </form>
+        <div id="vs-search-out"></div>
+      </div>
+
+      <div class="vs-step">
+        <h3>5. 질문 (Responses + file_search)</h3>
+        <form class="chat" id="vs-ask-form">
+          <textarea id="vs-question" rows="2" placeholder="예: 문서의 비밀 코드명이 뭐야?"></textarea>
+          <button type="submit" class="btn primary" id="vs-ask">질문</button>
+        </form>
+        <div id="vs-ask-out"></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Case D · OCI SDK 네이티브 API (embed / rerank / chat)</h2>
+    <div class="card">
+      <span class="tag primary">oci.generative_ai_inference · 사용자 principal</span>
+      <h3>모델 이름 직접 호출 vs Seoul 라우팅 프로파일 경유</h3>
+      <p>같은 기능을 OpenAI 호환 API 대신 <b>OCI Python SDK</b>(<code>GenerativeAiInferenceClient</code>)로 호출합니다. API 키가 아니라 <code>~/.oci/config</code> 프로파일의 <b>OCI 요청 서명</b>(사용자 principal)을 쓰며, <code>serving_mode=OnDemandServingMode(model_id)</code>의 <code>model_id</code>에는 모델 이름이나 라우팅 프로파일 OCID를 넣을 수 있습니다.</p>
+      <ul class="note">
+        <li><b>embed / rerank는 라우팅 프로파일로 라우팅되지 않습니다.</b> Seoul에서는 모델 이름 직접 호출만 가능하며 리전 제약으로 실패합니다.</li>
+        <li>Cohere Command 계열(<code>cohere.command-a-03-2025</code>)은 <code>api_format=COHERE</code>(<code>CohereChatRequest</code>)가 필요합니다. GENERIC으로 보내면 실패합니다.</li>
+        <li><code>google.gemini-2.5-pro</code>는 현재 Chicago에서도 Google 측 <code>NOT_FOUND</code>를 반환합니다.</li>
+        <li>Seoul에서 Gemini를 모델 이름으로 직접 호출하면 Google <code>asia-northeast3</code>로 전달되어 실패합니다.</li>
+      </ul>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="controls">
+        <div class="seg" id="d-case-seg" role="group" aria-label="Case D 엔드포인트 리전">
+          <button type="button" data-v="A" aria-pressed="true">A · Chicago</button>
+          <button type="button" data-v="B" aria-pressed="false">B · Seoul</button>
+        </div>
+        <span class="note" id="d-region-note"></span>
+      </div>
+      <div class="d-forms">
+        <form id="d-embed-form">
+          <h3>임베딩</h3>
+          <label for="d-embed-model">모델</label><select id="d-embed-model"></select>
+          <label for="d-embed-inputs">입력 (한 줄에 하나)</label>
+          <textarea id="d-embed-inputs" rows="3">안녕하세요
+서울은 대한민국의 수도이다.</textarea>
+          <button type="submit" class="btn primary">임베딩</button>
+          <div id="d-embed-out"></div>
+        </form>
+        <form id="d-rerank-form">
+          <h3>리랭크</h3>
+          <label for="d-rerank-model">모델</label><select id="d-rerank-model"></select>
+          <label for="d-rerank-query">질의</label>
+          <input class="text" id="d-rerank-query" value="시카고는 어디에 있나?">
+          <label for="d-rerank-docs">문서 (한 줄에 하나)</label>
+          <textarea id="d-rerank-docs" rows="3">서울은 대한민국의 수도이다.
+시카고는 미국 일리노이주에 있다.
+OCI Generative AI는 라우팅 프로파일을 지원한다.</textarea>
+          <button type="submit" class="btn primary">리랭크</button>
+          <div id="d-rerank-out"></div>
+        </form>
+        <form id="d-chat-form">
+          <h3>채팅</h3>
+          <label for="d-chat-model">모델 (api_format은 cohere.*이면 COHERE, 아니면 GENERIC)</label><select id="d-chat-model"></select>
+          <label for="d-chat-msg">메시지</label>
+          <input class="text" id="d-chat-msg" value="Reply with the single word OK.">
+          <button type="submit" class="btn primary">보내기</button>
+          <div id="d-chat-out"></div>
+        </form>
+      </div>
+      <div class="vs-step">
+        <h3>전체 매트릭스</h3>
+        <div class="controls">
+          <button type="button" class="btn primary" id="d-matrix-btn">전체 매트릭스 실행</button>
+          <span class="note" id="d-matrix-status">embed + rerank + chat(grok-4.3, gpt-oss-120b, gemini-2.5-flash, command-a). Case B는 프로파일 경유도 함께 실행합니다.</span>
+        </div>
+        <div id="d-matrix-out"></div>
+      </div>
+    </div>
+  </section>
+  </div>
+
+  <div id="tab-policies" role="tabpanel" aria-labelledby="tab-btn-policies" hidden>
+    <section>
+      <h2>필요 정책 (최소, family 없이)</h2>
+      <p class="note" id="pol-note">불러오는 중…</p>
+      <div id="pol-groups"></div>
+      <div class="card" style="margin-top:16px">
+        <h3>이 예제에 필요한 최소 세트 (family 없이)</h3>
+        <div class="code-wrap"><pre class="code" id="pol-minimal"></pre><button type="button" class="copy" data-copy-from="pol-minimal">복사</button></div>
+      </div>
+      <p class="note">출처: <code id="pol-source">docs/07-minimal-iam-policies.md</code></p>
+    </section>
+  </div>
+</main>
+
+<script>
+const state = { case: "B", api: "chat_completions", messages: [], busy: false };
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+function setupSeg(id, key, onChange) {
+  $(id).addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b || state.busy) return;
+    state[key] = b.dataset.v;
+    $(id).querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    onChange && onChange();
+  });
+}
+
+function errorBox(err) {
+  const d = document.createElement("div");
+  d.className = "error";
+  d.innerHTML = `<b>오류${err.status ? " " + esc(err.status) : ""}</b>: ${esc(err.message)}` + (err.body ? `<pre>${esc(err.body)}</pre>` : "");
+  return d;
+}
+
+async function loadConfig() {
+  const body = $("config-body");
+  try {
+    const r = await fetch("/api/config");
+    const cfg = await r.json();
+    initVS(cfg.C);
+    initD(cfg.D);
+    body.innerHTML = Object.entries(cfg).filter(([k]) => k === "A" || k === "B").map(([k, c]) => `<tr>
+      <td>Case ${esc(k)}</td><td><code>${esc(c.region)}</code></td><td><code>${esc(c.base_url)}</code></td>
+      <td><code>${esc(c.profile_ocid_masked || "—")}</code></td><td>${esc(c.model_label)}</td>
+      <td class="${c.configured ? "ok" : "bad"}">${c.configured ? "구성됨" : "미구성"}</td></tr>`).join("");
+  } catch (e) {
+    body.innerHTML = `<tr><td colspan="6" class="bad">구성 정보를 불러오지 못했습니다: ${esc(e.message)}</td></tr>`;
+  }
+}
+
+function resetChat() {
+  state.messages = [];
+  $("transcript").innerHTML = '<p class="empty">메시지를 입력하세요. 대화 기록은 브라우저에만 보관되며 매 요청마다 다시 전송됩니다.</p>';
+}
+
+function addBubble(role, text) {
+  const t = $("transcript");
+  t.querySelector(".empty")?.remove();
+  const d = document.createElement("div");
+  d.className = "msg " + role;
+  const body = document.createElement("div");
+  body.textContent = text;
+  d.appendChild(body);
+  t.appendChild(d);
+  t.scrollTop = t.scrollHeight;
+  return { el: d, body };
+}
+
+function renderInfo(el, meta, done) {
+  let info = el.querySelector(".info");
+  if (!info) { info = document.createElement("div"); info.className = "info"; el.appendChild(info); }
+  const sel = meta.selected_region ?? "(헤더 없음)";
+  const parts = [`엔드포인트 리전 <b>${esc(meta.endpoint_region)}</b> → 서빙 리전 <b>${esc(sel)}</b> (x-genai-selected-region)`];
+  if (meta.latency_first_token_ms != null) parts.push(`첫 토큰 ${meta.latency_first_token_ms} ms`);
+  if (done) parts.push(`전체 ${done.total_ms} ms · ${done.output_chars}자`);
+  if (meta.request_id) parts.push(`request-id ${esc(meta.request_id)}`);
+  info.innerHTML = parts.join(" · ");
+}
+
+function parseSSE(buffer, onEvent) {
+  const blocks = buffer.split("\n\n");
+  const rest = blocks.pop();
+  for (const block of blocks) {
+    let event = "message", data = "";
+    for (const line of block.split("\n")) {
+      if (line.startsWith("event: ")) event = line.slice(7);
+      else if (line.startsWith("data: ")) data += line.slice(6);
+    }
+    if (data) onEvent(event, JSON.parse(data));
+  }
+  return rest;
+}
+
+async function sendChat(text) {
+  state.messages.push({ role: "user", content: text });
+  addBubble("user", text);
+  const { el, body } = addBubble("assistant", "…");
+  let out = "", meta = null, failed = false;
+  setBusy(true);
+  try {
+    const r = await fetch("/api/chat", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ case: state.case, api: state.api, messages: state.messages }),
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      throw { status: r.status, message: typeof j.detail === "string" ? j.detail : "요청 실패", body: JSON.stringify(j) };
+    }
+    const reader = r.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf = parseSSE(buf + dec.decode(value, { stream: true }), (ev, data) => {
+        if (ev === "meta") { meta = data; renderInfo(el, meta); }
+        else if (ev === "delta") { out += data.text; body.textContent = out; $("transcript").scrollTop = 1e9; }
+        else if (ev === "done") { if (meta) renderInfo(el, meta, data); }
+        else if (ev === "error") { failed = true; el.appendChild(errorBox(data)); }
+      });
+    }
+  } catch (e) {
+    failed = true;
+    el.appendChild(errorBox(e.message && !e.status ? { message: e.message } : e));
+  }
+  if (!out) body.textContent = failed ? "(응답 없음)" : "(빈 응답)";
+  if (out) state.messages.push({ role: "assistant", content: out });
+  else state.messages.pop();
+  setBusy(false);
+}
+
+function setBusy(b) {
+  state.busy = b;
+  $("send").disabled = b; $("probe-btn").disabled = b; $("reset").disabled = b;
+}
+
+async function runProbe() {
+  const n = Math.min(20, Math.max(1, parseInt($("probe-n").value, 10) || 5));
+  const out = $("probe-out");
+  out.innerHTML = "";
+  $("probe-status").textContent = `Case ${state.case}로 ${n}회 요청 중…`;
+  setBusy(true);
+  try {
+    const r = await fetch("/api/probe", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ case: state.case, n }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw { status: r.status, message: typeof j.detail === "string" ? j.detail : "요청 실패", body: JSON.stringify(j) };
+    const max = Math.max(...Object.values(j.histogram));
+    const bars = Object.entries(j.histogram).sort((a, b) => b[1] - a[1]).map(([reg, c]) =>
+      `<div class="bar-row"><code>${esc(reg)}</code><div class="bar" style="width:${(c / max) * 100}%"></div><span>${c}</span></div>`).join("");
+    const rows = j.results.map((x) => `<tr><td>${x.i}</td><td><code>${esc(x.selected_region ?? "—")}</code></td>
+      <td>${x.latency_ms} ms</td><td class="${x.status === 200 ? "ok" : "bad"}">${esc(x.status)}${x.error ? " · " + esc(x.error) : ""}</td></tr>`).join("");
+    out.innerHTML = `<p class="note">엔드포인트 리전 <code>${esc(j.endpoint_region)}</code></p><div class="bars">${bars}</div>
+      <div class="table-wrap"><table><thead><tr><th>#</th><th>서빙 리전</th><th>지연</th><th>상태</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    $("probe-status").textContent = "완료";
+  } catch (e) {
+    $("probe-status").textContent = "";
+    out.appendChild(errorBox(e.message && !e.status ? { message: e.message } : e));
+  }
+  setBusy(false);
+}
+
+setupSeg("case-seg", "case", resetChat);
+setupSeg("api-seg", "api");
+$("reset").addEventListener("click", resetChat);
+$("probe-btn").addEventListener("click", runProbe);
+$("chat-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const text = $("input").value.trim();
+  if (!text || state.busy) return;
+  $("input").value = "";
+  sendChat(text);
+});
+$("input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("chat-form").requestSubmit(); }
+});
+// ---- Case C: 벡터 스토어 / File Search ----
+const vs = { cfg: null, token: 0 };
+state.vsCase = "A";
+const terminal = (st) => ["completed", "failed", "cancelled", "expired"].includes(st);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const fmtTime = (t) => (t ? new Date(t * 1000).toLocaleString("ko-KR") : "—");
+
+function initVS(c) {
+  vs.cfg = c || null;
+  if (!c) return;
+  $("vs-model").textContent = c.model;
+  if (c.default_vector_store_id && !$("vs-id").value) $("vs-id").value = c.default_vector_store_id;
+  renderVSRegion();
+}
+
+function renderVSRegion() {
+  const r = vs.cfg?.regions?.[state.vsCase];
+  if (!r) return;
+  const flags = [`프로젝트 ${r.project_set ? "설정됨" : "미설정"}`, `API 키 ${r.api_key_set ? "설정됨" : "미설정"}`,
+    `서명 프로파일 ${r.oci_profile}`, `컴파트먼트 ${vs.cfg.compartment_set ? "설정됨" : "미설정"}`];
+  $("vs-region-note").innerHTML = `<code>${esc(r.region)}</code> · ${flags.map(esc).join(" · ")}`;
+}
+
+async function vsFetch(url, opts) {
+  let r, j;
+  try { r = await fetch(url, opts); j = await r.json(); }
+  catch (e) { return { ok: false, status: null, message: e.message || "요청 실패" }; }
+  if (!r.ok) return { ok: false, status: r.status, message: typeof j.detail === "string" ? j.detail : "요청 실패", body: JSON.stringify(j) };
+  return j;
+}
+const postJSON = (body) => ({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+const activeVS = () => $("vs-id").value.trim();
+
+function showErr(outId, j) {
+  const out = $(outId);
+  const p = document.createElement("p");
+  p.className = "note";
+  p.innerHTML = `엔드포인트 리전 <code>${esc(j.endpoint_region ?? vsRegion())}</code>에서의 결과:`;
+  out.append(p, errorBox(j));
+}
+const vsRegion = () => vs.cfg?.regions?.[state.vsCase]?.region ?? state.vsCase;
+
+function needVS(outId) {
+  if (activeVS()) return true;
+  $(outId).innerHTML = "";
+  $(outId).appendChild(errorBox({ message: "활성 벡터 스토어가 없습니다. 생성하거나 목록에서 선택하세요." }));
+  return false;
+}
+
+async function vsCreate() {
+  const token = ++vs.token;
+  const name = $("vs-name").value.trim() || "demo-vector-store";
+  const out = $("vs-create-out"), st = $("vs-create-status");
+  out.innerHTML = ""; st.textContent = `${vsRegion()} 컨트롤 플레인에 생성 요청 중…`;
+  const j = await vsFetch("/api/vs/create", postJSON({ case: state.vsCase, name }));
+  if (!j.ok) { st.textContent = ""; showErr("vs-create-out", j); return; }
+  const id = j.data.id;
+  $("vs-id").value = id;
+  let status = j.data.status;
+  const render = (s, n) => {
+    out.innerHTML = `<p class="note">ID <code>${esc(id)}</code> · 상태 <b class="${s === "completed" ? "ok" : ""}">${esc(s)}</b>${n ? ` · 폴링 ${n}회` : ""}</p>`;
+  };
+  render(status, 0);
+  for (let n = 1; !terminal(status) && n <= 24 && token === vs.token; n++) {
+    st.textContent = "completed가 될 때까지 5초마다 확인 중… (보통 30~60초)";
+    await sleep(5000);
+    if (token !== vs.token) return;
+    const g = await vsFetch(`/api/vs/${encodeURIComponent(id)}?case=${state.vsCase}`);
+    if (!g.ok) { st.textContent = ""; showErr("vs-create-out", g); return; }
+    status = g.data.status; render(status, n);
+  }
+  st.textContent = terminal(status) ? "완료" : "아직 진행 중입니다. 목록을 새로고침해 확인하세요.";
+}
+
+async function vsList() {
+  const out = $("vs-list-out");
+  out.innerHTML = '<p class="note">불러오는 중…</p>';
+  const j = await vsFetch(`/api/vs/list?case=${state.vsCase}`);
+  out.innerHTML = "";
+  if (!j.ok) { showErr("vs-list-out", j); return; }
+  if (!j.data.length) { out.innerHTML = '<p class="note">벡터 스토어가 없습니다.</p>'; return; }
+  const cur = activeVS();
+  const rows = j.data.map((v) => {
+    const fc = v.file_counts ? `${v.file_counts.completed ?? 0}/${v.file_counts.total ?? 0}` : "—";
+    return `<tr class="pick${v.id === cur ? " sel" : ""}" data-id="${esc(v.id)}"><td><code>${esc(v.id)}</code></td><td>${esc(v.name ?? "")}</td>
+      <td class="${v.status === "completed" ? "ok" : ""}">${esc(v.status)}</td><td>${esc(fc)}</td><td>${esc(fmtTime(v.created_at))}</td></tr>`;
+  }).join("");
+  out.innerHTML = `<div class="table-wrap"><table><thead><tr><th>ID</th><th>이름</th><th>상태</th><th>파일(완료/전체)</th><th>생성</th></tr></thead>
+    <tbody>${rows}</tbody></table></div><p class="note">행을 클릭하면 활성 벡터 스토어로 선택됩니다.</p>`;
+}
+
+function renderFiles(rows) {
+  const out = $("vs-files-out");
+  if (!rows.length) { out.innerHTML = '<p class="note">연결된 파일이 없습니다.</p>'; return; }
+  out.innerHTML = `<div class="table-wrap"><table><thead><tr><th>파일 ID</th><th>상태</th><th>크기</th><th>생성</th></tr></thead><tbody>${rows.map((f) =>
+    `<tr><td><code>${esc(f.id)}</code></td><td class="${f.status === "completed" ? "ok" : f.status === "failed" ? "bad" : ""}">${esc(f.status)}${f.last_error ? " · " + esc(f.last_error) : ""}</td>
+     <td>${f.usage_bytes ?? "—"}</td><td>${esc(fmtTime(f.created_at))}</td></tr>`).join("")}</tbody></table></div>`;
+}
+
+async function vsUpload() {
+  if (!needVS("vs-files-out")) return;
+  const file = $("vs-file").files[0];
+  const st = $("vs-upload-status");
+  $("vs-files-out").innerHTML = "";
+  if (!file) { $("vs-files-out").appendChild(errorBox({ message: "업로드할 파일을 선택하세요." })); return; }
+  const token = ++vs.token, id = activeVS();
+  const fd = new FormData(); fd.append("file", file); fd.append("case", state.vsCase);
+  st.textContent = "업로드 및 연결 중…";
+  const j = await vsFetch(`/api/vs/${encodeURIComponent(id)}/files`, { method: "POST", body: fd });
+  if (!j.ok) { st.textContent = ""; showErr("vs-files-out", j); return; }
+  st.textContent = `파일 ${j.data.file_id} 연결됨 (${j.data.status}). 인덱싱 완료까지 5초마다 확인 중…`;
+  for (let n = 1; n <= 24 && token === vs.token; n++) {
+    const l = await vsFetch(`/api/vs/${encodeURIComponent(id)}/files?case=${state.vsCase}`);
+    if (token !== vs.token) return;
+    if (!l.ok) { st.textContent = ""; showErr("vs-files-out", l); return; }
+    renderFiles(l.data);
+    if (l.data.every((f) => terminal(f.status))) { st.textContent = "완료"; return; }
+    await sleep(5000);
+  }
+  if (token === vs.token) st.textContent = "아직 처리 중입니다. 잠시 후 다시 확인하세요.";
+}
+
+async function vsSearch(query) {
+  const out = $("vs-search-out");
+  if (!needVS("vs-search-out")) return;
+  out.innerHTML = '<p class="note">검색 중…</p>';
+  const j = await vsFetch(`/api/vs/${encodeURIComponent(activeVS())}/search`, postJSON({ case: state.vsCase, query, max_num_results: 5 }));
+  out.innerHTML = "";
+  if (!j.ok) { showErr("vs-search-out", j); return; }
+  if (!j.data.length) { out.innerHTML = '<p class="note">결과가 없습니다.</p>'; return; }
+  out.innerHTML = j.data.map((r) => `<div class="chunk"><span class="score">score ${Number(r.score).toFixed(4)}</span>
+    ${r.filename ? `<span class="note"> · ${esc(r.filename)}</span>` : ""}<div>${esc(r.text)}</div></div>`).join("");
+}
+
+async function vsAsk(question) {
+  const out = $("vs-ask-out");
+  if (!needVS("vs-ask-out")) return;
+  out.innerHTML = "";
+  const wrap = document.createElement("div");
+  const body = document.createElement("div"); body.className = "answer"; body.textContent = "…";
+  wrap.appendChild(body); out.appendChild(wrap);
+  $("vs-ask").disabled = true;
+  let text = "", meta = null, failed = false;
+  try {
+    const r = await fetch(`/api/vs/${encodeURIComponent(activeVS())}/ask`, postJSON({ case: state.vsCase, question }));
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      throw { status: r.status, message: typeof j.detail === "string" ? j.detail : "요청 실패", body: JSON.stringify(j) };
+    }
+    const reader = r.body.getReader(), dec = new TextDecoder();
+    let buf = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf = parseSSE(buf + dec.decode(value, { stream: true }), (ev, data) => {
+        if (ev === "meta") { meta = data; renderInfo(wrap, meta); wrap.querySelector(".info").insertAdjacentHTML("beforeend", ` · 모델 <b>${esc(meta.model)}</b>`); }
+        else if (ev === "delta") { text += data.text; body.textContent = text; }
+        else if (ev === "done") { if (meta) { renderInfo(wrap, meta, data); wrap.querySelector(".info").insertAdjacentHTML("beforeend", ` · 모델 <b>${esc(meta.model)}</b>`); } }
+        else if (ev === "error") { failed = true; wrap.appendChild(errorBox(data)); }
+      });
+    }
+  } catch (e) {
+    failed = true;
+    wrap.appendChild(errorBox(e.message && !e.status ? { message: e.message } : e));
+  }
+  if (!text) body.textContent = failed ? "(응답 없음)" : "(빈 응답)";
+  $("vs-ask").disabled = false;
+}
+
+$("vs-case-seg").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  state.vsCase = b.dataset.v; vs.token++;
+  $("vs-case-seg").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  ["vs-create-out", "vs-list-out", "vs-files-out", "vs-search-out", "vs-ask-out"].forEach((id) => { $(id).innerHTML = ""; });
+  ["vs-create-status", "vs-upload-status"].forEach((id) => { $(id).textContent = ""; });
+  renderVSRegion();
+});
+$("vs-create").addEventListener("click", vsCreate);
+$("vs-list-btn").addEventListener("click", vsList);
+$("vs-list-out").addEventListener("click", (e) => {
+  const tr = e.target.closest("tr.pick"); if (!tr) return;
+  $("vs-id").value = tr.dataset.id;
+  $("vs-list-out").querySelectorAll("tr.pick").forEach((x) => x.classList.toggle("sel", x === tr));
+});
+$("vs-upload").addEventListener("click", vsUpload);
+$("vs-search-form").addEventListener("submit", (e) => {
+  e.preventDefault(); const q = $("vs-query").value.trim(); if (q) vsSearch(q);
+});
+$("vs-ask-form").addEventListener("submit", (e) => {
+  e.preventDefault(); const q = $("vs-question").value.trim(); if (q && !$("vs-ask").disabled) vsAsk(q);
+});
+$("vs-question").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("vs-ask-form").requestSubmit(); }
+});
+// ---- 탭 ----
+const TABS = ["demo", "policies"];
+function showTab() {
+  const cur = TABS.includes(location.hash.slice(1)) ? location.hash.slice(1) : "demo";
+  TABS.forEach((t) => {
+    $("tab-" + t).hidden = t !== cur;
+    $("tab-btn-" + t).setAttribute("aria-selected", String(t === cur));
+  });
+  if (cur === "policies") loadPolicies();
+}
+window.addEventListener("hashchange", showTab);
+
+// ---- 필요 정책 탭 ----
+let policiesLoaded = false;
+async function copyText(text, btn) {
+  try { await navigator.clipboard.writeText(text); }
+  catch {
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); } finally { ta.remove(); }
+  }
+  if (btn) { const t = btn.textContent; btn.textContent = "복사됨"; setTimeout(() => { btn.textContent = t; }, 1200); }
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("button.copy"); if (!b) return;
+  copyText(b.dataset.copy ?? $(b.dataset.copyFrom)?.textContent ?? "", b);
+});
+
+async function loadPolicies() {
+  if (policiesLoaded) return;
+  try {
+    const r = await fetch("/api/policies");
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const j = await r.json();
+    policiesLoaded = true;
+    $("pol-note").textContent = j.note || "";
+    if (j.source) $("pol-source").textContent = j.source;
+    $("pol-groups").innerHTML = (j.groups || []).map((g) => `<div class="card" style="margin-top:16px"><h3>${esc(g.title)}</h3>
+      <div class="table-wrap"><table><thead><tr><th>기능</th><th>리소스 타입</th><th>최소 동사</th><th>정책</th><th>비고</th><th>실측</th></tr></thead><tbody>
+      ${(g.items || []).map((it) => `<tr><td>${esc(it.feature)}</td><td><code>${esc(it.resource)}</code></td><td>${esc(it.verb)}</td>
+        <td style="min-width:280px"><div class="code-wrap"><pre class="code">${esc(it.policy)}</pre><button type="button" class="copy" data-copy="${esc(it.policy)}">복사</button></div></td>
+        <td>${esc(it.note)}</td><td class="${it.verified ? "ok" : "note"}">${it.verified ? "✔" : "추정"}</td></tr>`).join("")}
+      </tbody></table></div></div>`).join("");
+    $("pol-minimal").textContent = j.minimal_set || "";
+  } catch (e) {
+    $("pol-note").innerHTML = "";
+    $("pol-note").appendChild(errorBox({ message: `정책을 불러오지 못했습니다: ${e.message}` }));
+  }
+}
+
+// ---- Case D: OCI SDK 네이티브 ----
+const d = { cfg: null, case: "A", models: null, token: 0 };
+const MATRIX_CHAT = ["xai.grok-4.3", "openai.gpt-oss-120b", "google.gemini-2.5-flash", "cohere.command-a-03-2025"];
+const apiFormat = (model) => (model.startsWith("cohere.") ? "COHERE" : "GENERIC");
+const lines = (id) => $(id).value.split("\n").map((x) => x.trim()).filter(Boolean);
+
+function initD(c) {
+  d.cfg = c || null;
+  loadSDKModels();
+}
+
+function renderDRegion() {
+  const m = d.models;
+  const prof = d.cfg?.oci_profiles?.[d.case] ?? "?";
+  const comp = d.cfg ? (d.cfg.compartment_set ? "설정됨" : "미설정") : "?";
+  const nprof = m ? Object.keys(m.profiles || {}).length : 0;
+  $("d-region-note").innerHTML = `<code>${esc(m?.endpoint_region ?? d.case)}</code> · 서명 프로파일 ${esc(prof)} · 컴파트먼트 ${esc(comp)}` +
+    (d.case === "B" ? ` · 라우팅 프로파일 ${nprof}개` : "");
+}
+
+function chatEntries(m) {
+  const out = [];
+  for (const fmt of ["GENERIC", "COHERE"]) for (const model of m.chat?.[fmt] || []) out.push({ label: `direct: ${model}`, model, model_id: model, via: "direct" });
+  for (const [model, ocid] of Object.entries(m.profiles || {})) out.push({ label: `profile: ${model} → Chicago`, model, model_id: ocid, via: "profile" });
+  return out;
+}
+
+function fillSelect(id, entries) {
+  $(id).innerHTML = entries.map((e, i) => `<option value="${i}">${esc(e.label)}</option>`).join("");
+  $(id)._entries = entries;
+}
+const picked = (id) => $(id)._entries?.[Number($(id).value)];
+
+async function loadSDKModels() {
+  const token = ++d.token;
+  const j = await vsFetch(`/api/sdk/models?case=${d.case}`);
+  if (token !== d.token) return;
+  if (!j.ok) { $("d-region-note").textContent = ""; $("d-matrix-out").appendChild(errorBox(j)); return; }
+  d.models = j;
+  const direct = (list) => (list || []).map((model) => ({ label: `direct: ${model}`, model, model_id: model, via: "direct" }));
+  fillSelect("d-embed-model", direct(j.embed));
+  fillSelect("d-rerank-model", direct(j.rerank));
+  fillSelect("d-chat-model", chatEntries(j));
+  renderDRegion();
+}
+
+function dErr(j) {
+  const parts = [j.status ?? "—", j.code ?? ""].filter((x) => x !== "").join(" ");
+  const box = errorBox({ status: null, message: `${parts}: ${j.message ?? ""}`, body: j.request_id ? `opc-request-id ${j.request_id}` : null });
+  return box;
+}
+
+function dMeta(j) {
+  return `<div class="info">엔드포인트 <b>${esc(j.endpoint_region)}</b> · ${esc(j.auth)} (${esc(j.oci_profile)}) · model_id <code>${esc(j.model_id)}</code> · ${j.latency_ms} ms` +
+    (j.opc_request_id ? ` · opc-request-id ${esc(j.opc_request_id)}` : "") + "</div>";
+}
+
+function renderD(outId, j, body) {
+  const out = $(outId);
+  out.innerHTML = "";
+  const wrap = document.createElement("div"); wrap.className = "result";
+  if (j.ok) wrap.innerHTML = body(j.data) + dMeta(j);
+  else { wrap.appendChild(dErr(j)); if (j.endpoint_region) wrap.insertAdjacentHTML("beforeend", dMeta(j)); }
+  out.appendChild(wrap);
+}
+
+const dEmbed = (e, inputs) => vsFetch("/api/sdk/embed", postJSON({ case: d.case, model_id: e.model_id, inputs }));
+const dRerank = (e, query, documents) => vsFetch("/api/sdk/rerank", postJSON({ case: d.case, model_id: e.model_id, query, documents, top_n: 3 }));
+const dChat = (e, message) => vsFetch("/api/sdk/chat", postJSON({ case: d.case, model_id: e.model_id, api_format: apiFormat(e.model), message, max_tokens: 200 }));
+
+async function withBusy(form, fn) {
+  const btn = form.querySelector("button[type=submit]");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try { await fn(); } finally { btn.disabled = false; }
+}
+
+$("d-embed-form").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const e = picked("d-embed-model"), inputs = lines("d-embed-inputs");
+  if (!e || !inputs.length) return;
+  withBusy(ev.target, async () => {
+    $("d-embed-out").innerHTML = '<p class="note">요청 중…</p>';
+    renderD("d-embed-out", await dEmbed(e, inputs), (x) =>
+      `<b class="ok">OK</b> · count ${x.count} · dims ${x.dims}<pre>first_values ${esc(JSON.stringify(x.first_values))}</pre>`);
+  });
+});
+$("d-rerank-form").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const e = picked("d-rerank-model"), q = $("d-rerank-query").value.trim(), docs = lines("d-rerank-docs");
+  if (!e || !q || !docs.length) return;
+  withBusy(ev.target, async () => {
+    $("d-rerank-out").innerHTML = '<p class="note">요청 중…</p>';
+    renderD("d-rerank-out", await dRerank(e, q, docs), (x) => `<b class="ok">OK</b>` + x.map((r) =>
+      `<div class="chunk"><span class="score">#${r.index} · ${Number(r.relevance_score).toFixed(4)}</span><div>${esc(r.document)}</div></div>`).join(""));
+  });
+});
+$("d-chat-form").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const e = picked("d-chat-model"), msg = $("d-chat-msg").value.trim();
+  if (!e || !msg) return;
+  withBusy(ev.target, async () => {
+    $("d-chat-out").innerHTML = '<p class="note">요청 중…</p>';
+    renderD("d-chat-out", await dChat(e, msg), (x) =>
+      `<b class="ok">OK</b> · api_format ${esc(x.api_format)}<div class="answer">${esc(x.text || "(빈 응답)")}</div>`);
+  });
+});
+
+async function runMatrix() {
+  const m = d.models; if (!m) return;
+  const btn = $("d-matrix-btn"), out = $("d-matrix-out"), st = $("d-matrix-status");
+  const token = d.token;
+  const direct = (model) => ({ model, model_id: model, via: "direct" });
+  const embedIn = lines("d-embed-inputs"), q = $("d-rerank-query").value.trim() || "시카고는 어디에 있나?";
+  const docs = lines("d-rerank-docs");
+  const jobs = [];
+  for (const model of m.embed || []) jobs.push({ api: "embed", e: direct(model), run: (e) => dEmbed(e, embedIn.length ? embedIn : ["안녕하세요"]) });
+  for (const model of m.rerank || []) jobs.push({ api: "rerank", e: direct(model), run: (e) => dRerank(e, q, docs.length ? docs : ["서울", "시카고"]) });
+  for (const model of MATRIX_CHAT) {
+    jobs.push({ api: "chat", e: direct(model), run: (e) => dChat(e, "Reply with the single word OK.") });
+    const ocid = d.case === "B" ? m.profiles?.[model] : null;
+    if (ocid) jobs.push({ api: "chat", e: { model, model_id: ocid, via: "profile" }, run: (e) => dChat(e, "Reply with the single word OK.") });
+  }
+  btn.disabled = true;
+  out.innerHTML = "";
+  const rows = [];
+  const render = () => {
+    out.innerHTML = `<div class="table-wrap"><table><thead><tr><th>API</th><th>모델</th><th>경로</th><th>결과</th><th>지연</th></tr></thead><tbody>${rows.map((r) => `<tr>
+      <td>${esc(r.api)}</td><td><code>${esc(r.e.model)}</code></td><td>${r.e.via === "profile" ? "profile → Chicago" : "direct"}</td>
+      <td class="${r.j ? (r.j.ok ? "ok" : "bad") : "note"}">${r.j ? (r.j.ok ? "OK" : esc(`${r.j.status ?? "—"} ${r.j.code ?? ""}`)) : "…"}${r.j && !r.j.ok ? `<div class="note">${esc(String(r.j.message ?? "").slice(0, 160))}</div>` : ""}</td>
+      <td>${r.j?.latency_ms != null ? r.j.latency_ms + " ms" : ""}</td></tr>`).join("")}</tbody></table></div>`;
+  };
+  for (const job of jobs) rows.push({ api: job.api, e: job.e, j: null });
+  render();
+  try {
+    for (let i = 0; i < jobs.length; i++) {
+      st.textContent = `${i + 1}/${jobs.length} 실행 중… (Case ${d.case})`;
+      const j = await jobs[i].run(jobs[i].e);
+      if (token !== d.token) return;
+      rows[i].j = j; render();
+    }
+    st.textContent = `완료 · Case ${d.case} (${m.endpoint_region})`;
+  } finally { btn.disabled = false; }
+}
+$("d-matrix-btn").addEventListener("click", runMatrix);
+
+$("d-case-seg").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  d.case = b.dataset.v;
+  $("d-case-seg").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  ["d-embed-out", "d-rerank-out", "d-chat-out", "d-matrix-out"].forEach((id) => { $(id).innerHTML = ""; });
+  $("d-matrix-status").textContent = "";
+  loadSDKModels();
+});
+
+showTab();
+loadConfig();
+</script>
+</body>
+</html>

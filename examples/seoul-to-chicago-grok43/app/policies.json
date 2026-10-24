@@ -1,0 +1,214 @@
+{
+  "source": "docs/07-minimal-iam-policies.md",
+  "updated": "2026-10-24",
+  "note": "family 미사용 최소 정책. '추정'은 문서에 동사 매핑이 없어 추론한 항목. 현재 테넌시는 family 정책으로 운영 중이라 최소 세트는 미검증.",
+  "groups": [
+    {
+      "id": "inference",
+      "title": "A. 모델 호출 (사용자/그룹)",
+      "items": [
+        {
+          "feature": "Chat (네이티브 / OpenAI 호환)",
+          "resource": "generative-ai-chat",
+          "verb": "use",
+          "policy": "allow group <group> to use generative-ai-chat in compartment <compartment>",
+          "note": "권한 GENERATIVE_AI_CHAT",
+          "verified": true
+        },
+        {
+          "feature": "임베딩 EmbedText",
+          "resource": "generative-ai-text-embedding",
+          "verb": "use",
+          "policy": "allow group <group> to use generative-ai-text-embedding in compartment <compartment>",
+          "note": "Seoul 불가(리전 제약)",
+          "verified": true
+        },
+        {
+          "feature": "리랭크 RerankText",
+          "resource": "generative-ai-text-rerank",
+          "verb": "use (추정)",
+          "policy": "allow group <group> to use generative-ai-text-rerank in compartment <compartment>",
+          "note": "권한 페이지 없음",
+          "verified": false
+        },
+        {
+          "feature": "모델 목록",
+          "resource": "generative-ai-model",
+          "verb": "inspect",
+          "policy": "allow group <group> to inspect generative-ai-model in tenancy",
+          "note": "target.model.id 조건은 ListModels에 미적용",
+          "verified": true
+        },
+        {
+          "feature": "라우팅 프로파일로 호출",
+          "resource": "generative-ai-routing-profile",
+          "verb": "read (+ chat use)",
+          "policy": "allow group <group> to read generative-ai-routing-profile in compartment <compartment>",
+          "note": "프로파일 OCID를 model로 쓰면 READ 필요",
+          "verified": true
+        },
+        {
+          "feature": "모델 제한 조건",
+          "resource": "generative-ai-chat",
+          "verb": "use + where",
+          "policy": "allow group <group> to use generative-ai-chat in compartment <compartment> where ANY {target.model.id='xai.grok-4.3', target.model.id='openai.gpt-oss-120b'}",
+          "note": "chat/embedding/rerank에만 적용, 패턴 /google.gemini-.*/ 가능",
+          "verified": false
+        }
+      ]
+    },
+    {
+      "id": "apikey",
+      "title": "B. OpenAI 호환 API 키 principal",
+      "items": [
+        {
+          "feature": "키 관리",
+          "resource": "generative-ai-apikey",
+          "verb": "manage",
+          "policy": "allow group <group> to manage generative-ai-apikey in compartment <compartment>",
+          "note": "",
+          "verified": true
+        },
+        {
+          "feature": "키로 채팅 (모델 제한)",
+          "resource": "generative-ai-chat",
+          "verb": "use + where",
+          "policy": "allow any-user to use generative-ai-chat in compartment <compartment> where ALL {request.principal.type='generativeaiapikey', target.model.id in ('xai.grok-4.3')}",
+          "note": "",
+          "verified": false
+        },
+        {
+          "feature": "키로 라우팅 프로파일 사용",
+          "resource": "generative-ai-routing-profile",
+          "verb": "read + where",
+          "policy": "allow any-user to read generative-ai-routing-profile in compartment <compartment> where ALL {request.principal.type='generativeaiapikey'}",
+          "note": "",
+          "verified": false
+        },
+        {
+          "feature": "특정 키 1개만",
+          "resource": "(any)",
+          "verb": "where",
+          "policy": "... where ALL {request.principal.type='generativeaiapikey', request.principal.id='<api-key-OCID>'}",
+          "note": "",
+          "verified": false
+        },
+        {
+          "feature": "키로 Files/Vector store/Responses",
+          "resource": "generative-ai-file, generative-ai-vectorstore-file, generative-ai-project",
+          "verb": "manage/manage/read (추정)",
+          "policy": "allow any-user to manage generative-ai-file in compartment <compartment> where ALL {request.principal.type='generativeaiapikey'}",
+          "note": "문서 미명시. 실측은 use generative-ai-family 조건부 정책으로 동작",
+          "verified": false
+        }
+      ]
+    },
+    {
+      "id": "agents",
+      "title": "C. Projects / Files / Vector stores",
+      "items": [
+        {
+          "feature": "프로젝트 생성",
+          "resource": "generative-ai-project",
+          "verb": "manage",
+          "policy": "allow group <group> to manage generative-ai-project in compartment <compartment>",
+          "note": "Seoul에서도 생성 가능",
+          "verified": true
+        },
+        {
+          "feature": "파일 업로드/삭제",
+          "resource": "generative-ai-file",
+          "verb": "manage",
+          "policy": "allow group <group> to manage generative-ai-file in compartment <compartment>",
+          "note": "동사 매핑 미명시",
+          "verified": false
+        },
+        {
+          "feature": "벡터 스토어 생성/목록 (컨트롤 플레인, IAM 서명)",
+          "resource": "generative-ai-vector-store",
+          "verb": "manage",
+          "policy": "allow group <group> to manage generative-ai-vector-store in compartment <compartment>",
+          "note": "Seoul은 정책과 무관하게 403 not supported",
+          "verified": true
+        },
+        {
+          "feature": "벡터 스토어 파일 연결/검색",
+          "resource": "generative-ai-vectorstore-file",
+          "verb": "manage",
+          "policy": "allow group <group> to manage generative-ai-vectorstore-file in compartment <compartment>",
+          "note": "",
+          "verified": false
+        },
+        {
+          "feature": "Object Storage 커넥터 (동적 그룹)",
+          "resource": "generativeaivectorconnector",
+          "verb": "read object-family",
+          "policy": "allow dynamic-group <dg> to read object-family in compartment <compartment>",
+          "note": "DG 규칙 all {resource.type='generativeaivectorconnector'}",
+          "verified": false
+        },
+        {
+          "feature": "Code Interpreter 컨테이너 / Sandbox",
+          "resource": "generative-ai-container, generative-ai-sandbox",
+          "verb": "manage",
+          "policy": "allow group <group> to manage generative-ai-container in compartment <compartment>",
+          "note": "",
+          "verified": false
+        }
+      ]
+    },
+    {
+      "id": "apps",
+      "title": "D. Applications (Hosted deployments)",
+      "items": [
+        {
+          "feature": "애플리케이션/배포 관리",
+          "resource": "generative-ai-hosted-application, -iam, generative-ai-hosted-deployment",
+          "verb": "manage (조회는 read)",
+          "policy": "allow group <group> to manage generative-ai-hosted-application in compartment <compartment>\nallow group <group> to manage generative-ai-hosted-deployment in compartment <compartment>",
+          "note": "Seoul 사용 가능. deploy 문서는 하이픈 없는 표기(generativeaihosteddeployment)도 사용",
+          "verified": false
+        },
+        {
+          "feature": "런타임의 OCIR 이미지 pull (동적 그룹)",
+          "resource": "repos, vss-family",
+          "verb": "read",
+          "policy": "allow dynamic-group <dg> to read repos in compartment <compartment>\nallow dynamic-group <dg> to read vss-family in compartment <compartment>",
+          "note": "DG 규칙 any {resource.type='generativeaihostedapplication', resource.type='generativeaihosteddeployment'}",
+          "verified": false
+        },
+        {
+          "feature": "런타임이 모델 호출",
+          "resource": "generative-ai-chat, generative-ai-routing-profile",
+          "verb": "use / read",
+          "policy": "allow dynamic-group <dg> to use generative-ai-chat in compartment <compartment>\nallow dynamic-group <dg> to read generative-ai-routing-profile in compartment <compartment>",
+          "note": "추정",
+          "verified": false
+        }
+      ]
+    },
+    {
+      "id": "admin",
+      "title": "E. 관리",
+      "items": [
+        {
+          "feature": "라우팅 프로파일 생성/삭제",
+          "resource": "generative-ai-routing-profile",
+          "verb": "manage",
+          "policy": "allow group <group> to manage generative-ai-routing-profile in compartment <compartment>",
+          "note": "",
+          "verified": true
+        },
+        {
+          "feature": "작업 요청 조회",
+          "resource": "generative-ai-work-request",
+          "verb": "read",
+          "policy": "allow group <group> to read generative-ai-work-request in compartment <compartment>",
+          "note": "프로젝트 생성 등 비동기 작업",
+          "verified": true
+        }
+      ]
+    }
+  ],
+  "minimal_set": "# 사용자 그룹 (CLI/SDK, 프로파일 YWDCLOUD / YWDCLOUD_CHICAGO)\nallow group <group> to inspect generative-ai-model in tenancy\nallow group <group> to use generative-ai-chat in compartment <c>\nallow group <group> to use generative-ai-text-embedding in compartment <c>\nallow group <group> to use generative-ai-text-rerank in compartment <c>\nallow group <group> to manage generative-ai-routing-profile in compartment <c>\nallow group <group> to manage generative-ai-apikey in compartment <c>\nallow group <group> to manage generative-ai-project in compartment <c>\nallow group <group> to manage generative-ai-vector-store in compartment <c>\nallow group <group> to manage generative-ai-vectorstore-file in compartment <c>\nallow group <group> to manage generative-ai-file in compartment <c>\nallow group <group> to read generative-ai-work-request in compartment <c>\n\n# API 키 principal (앱의 OpenAI 호환 호출)\nallow any-user to use generative-ai-chat in compartment <c> where ALL {request.principal.type='generativeaiapikey'}\nallow any-user to read generative-ai-routing-profile in compartment <c> where ALL {request.principal.type='generativeaiapikey'}\nallow any-user to read generative-ai-project in compartment <c> where ALL {request.principal.type='generativeaiapikey'}\nallow any-user to manage generative-ai-file in compartment <c> where ALL {request.principal.type='generativeaiapikey'}\nallow any-user to manage generative-ai-vectorstore-file in compartment <c> where ALL {request.principal.type='generativeaiapikey'}"
+}
