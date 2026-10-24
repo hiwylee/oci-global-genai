@@ -61,3 +61,4 @@
 - 검증(verifier 3차, sonnet): 시크릿 0건, SDK 프로브 Chicago/Seoul 기대값 일치, 앱 policies/sdk 엔드포인트 PASS, 문서 정합성 PASS. 지적 반영: docs/06 임베딩 프로파일 표기 통일, gpt-oss 빈 응답 주석 추가. 원본 logs/raw/20261024-1436-sdk-native-probe-verify.txt
 - 로그: 14:48 데모 서버 기동(사용자 열람용), 포트 8765
 - 15:06 git init + 공개 저장소 push: https://github.com/hiwylee/oci-global-genai (commit 12716e8). .gitignore로 .env, logs/raw/ 제외
+- 15:07 OCID/리소스 ID 마스킹 후 이력 재작성(orphan 1커밋) force push: ddb3bb1. 실제 ID 매핑은 logs/raw/ocid-map-secret.json(gitignore)
