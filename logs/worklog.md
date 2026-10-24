@@ -62,3 +62,5 @@
 - 로그: 14:48 데모 서버 기동(사용자 열람용), 포트 8765
 - 15:06 git init + 공개 저장소 push: https://github.com/hiwylee/oci-global-genai (commit 12716e8). .gitignore로 .env, logs/raw/ 제외
 - 15:07 OCID/리소스 ID 마스킹 후 이력 재작성(orphan 1커밋) force push: ddb3bb1. 실제 ID 매핑은 logs/raw/ocid-map-secret.json(gitignore)
+- 15:22 Case A 프로파일을 Seoul 엔드포인트에서 호출 테스트 (교차 리전 프로파일 가능 여부)
+- 15:34 사용자 승인 후 GitHub 저장소 삭제·재생성(hiwylee/oci-global-genai), 마스킹 커밋 2개만 푸시. 구 커밋 12716e8/cf19fe9 조회 불가 확인
